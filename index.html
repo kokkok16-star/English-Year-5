@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>English Grammar Adventure: The Lost Treasure</title>
+    
+    <!-- Scripts & Fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Nunito', 'sans-serif'],
+                        display: ['Fredoka', 'sans-serif'],
+                    },
+                    colors: {
+                        forest: { light: '#a7f3d0', DEFAULT: '#34d399', dark: '#059669', border: '#065f46' },
+                        castle: { light: '#ddd6fe', DEFAULT: '#a78bfa', dark: '#6d28d9', border: '#4c1d95' },
+                        gold: { light: '#fef08a', DEFAULT: '#facc15', dark: '#ca8a04', border: '#854d0e' },
+                        parchment: '#fef3c7',
+                        wood: '#78350f'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #0f172a;
+            overflow: hidden;
+            touch-action: none;
+        }
+        h1, h2, h3, .font-display { font-family: 'Fredoka', sans-serif; }
+        .hide { display: none !important; }
+
+        #map-viewport {
+            width: 100vw; height: 100vh;
+            overflow: auto;
+            position: relative;
+            background: linear-gradient(to bottom, #87CEEB 0%, #a2dcf3 30%, #7cba3d 30%, #5a9e27 100%);
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #map-world {
+            width: 1600px;
+            height: 1000px;
+            position: relative;
+            transform-origin: top left;
+        }
+
+        .map-bg-elements {
+            position: absolute; inset: 0; pointer-events: none;
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(74, 130, 30, 0.6) 0%, transparent 20%),
+                radial-gradient(circle at 80% 40%, rgba(74, 130, 30, 0.4) 0%, transparent 30%),
+                radial-gradient(circle at 50% 60%, rgba(104, 168, 44, 0.5) 0%, transparent 40%);
+        }
+
+        .map-path { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        .path-dirt { fill: none; stroke: #8b5a2b; stroke-width: 35; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 6px 4px rgba(0,0,0,0.3)); }
+        .path-inner { fill: none; stroke: #d2a679; stroke-width: 25; stroke-linecap: round; stroke-linejoin: round; }
+        .path-castle-dirt { fill: none; stroke: #4b5563; stroke-width: 35; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 6px 4px rgba(0,0,0,0.3)); }
+        .path-castle-inner { fill: none; stroke: #9ca3af; stroke-width: 25; stroke-linecap: round; stroke-linejoin: round; }
+
+        .level-node {
+            position: absolute;
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Fredoka', sans-serif; font-size: 1.5rem; font-weight: 700;
+            cursor: pointer; z-index: 10;
+            transform: translate(-50%, -50%);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .level-node.locked {
+            background: linear-gradient(145deg, #9ca3af, #6b7280);
+            color: #4b5563;
+            border: 4px solid #4b5563;
+            box-shadow: inset 0 -4px 0 rgba(0,0,0,0.2), 0 4px 6px rgba(0,0,0,0.3);
+            cursor: not-allowed;
+        }
+
+        .level-node.available {
+            background: linear-gradient(145deg, #fef08a, #facc15);
+            color: #854d0e;
+            border: 4px solid #ca8a04;
+            box-shadow: inset 0 -4px 0 rgba(202,138,4,0.6), 0 6px 12px rgba(0,0,0,0.4), 0 0 15px rgba(250, 204, 21, 0.6);
+            animation: pulse-glow 2s infinite;
+        }
+
+        .level-node.completed {
+            background: linear-gradient(145deg, #fcd34d, #f59e0b);
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            border: 4px solid #b45309;
+            box-shadow: inset 0 -4px 0 rgba(180,83,9,0.6), 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .level-node.current {
+            transform: translate(-50%, -50%) scale(1.2);
+            z-index: 11;
+        }
+
+        .level-node:active:not(.locked) { transform: translate(-50%, -45%) scale(1.1); box-shadow: inset 0 -2px 0 rgba(202,138,4,0.6), 0 2px 4px rgba(0,0,0,0.4); }
+
+        .star-badge {
+            position: absolute; top: -10px; right: -10px;
+            color: #fef08a; font-size: 18px;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
+            animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        #avatar {
+            position: absolute; width: 60px; height: 80px;
+            z-index: 20;
+            transform: translate(-50%, -100%);
+            pointer-events: none;
+            transition-timing-function: linear; 
+        }
+
+        .explorer { width: 100%; height: 100%; position: relative; }
+        
+        .e-shadow {
+            position: absolute; bottom: 0; left: 10px; right: 10px; height: 10px;
+            background: rgba(0,0,0,0.3); border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .e-body-group { position: absolute; bottom: 5px; left: 0; width: 100%; height: 75px; transform-origin: bottom center; }
+
+        .e-backpack {
+            position: absolute; top: 30px; left: 5px; width: 50px; height: 35px;
+            background: #854d0e; border-radius: 10px; border: 2px solid #451a03;
+        }
+
+        .e-body {
+            position: absolute; top: 35px; left: 15px; width: 30px; height: 30px;
+            background: #34d399; border-radius: 15px 15px 10px 10px; border: 2px solid #065f46;
+            display: flex; justify-content: center; overflow: hidden;
+        }
+        .e-belt { position: absolute; bottom: 5px; width: 100%; height: 4px; background: #451a03; }
+
+        .e-head {
+            position: absolute; top: 5px; left: 10px; width: 40px; height: 40px;
+            background: #fcd34d; border-radius: 50%; border: 2px solid #b45309;
+            z-index: 2;
+        }
+        .e-face { position: relative; width: 100%; height: 100%; }
+        .e-eye { position: absolute; top: 18px; width: 5px; height: 5px; background: #451a03; border-radius: 50%; }
+        .e-eye.l { left: 10px; }
+        .e-eye.r { right: 10px; }
+        .e-blush { position: absolute; top: 22px; width: 6px; height: 4px; background: rgba(239,68,68,0.5); border-radius: 50%; }
+        .e-blush.l { left: 6px; }
+        .e-blush.r { right: 6px; }
+        .e-mouth {
+            position: absolute; top: 25px; left: 16px; width: 8px; height: 4px;
+            border-bottom: 2px solid #451a03; border-radius: 0 0 10px 10px;
+            transition: all 0.2s;
+        }
+
+        .e-hat {
+            position: absolute; top: -8px; left: -5px; width: 50px; height: 25px;
+            background: #d97706; border-radius: 20px 20px 5px 5px; border: 2px solid #78350f; z-index: 3;
+        }
+        .e-hat-brim {
+            position: absolute; bottom: -2px; left: -8px; width: 66px; height: 8px;
+            background: #d97706; border-radius: 10px; border: 2px solid #78350f;
+        }
+
+        .e-leg {
+            position: absolute; bottom: -5px; width: 12px; height: 15px;
+            background: #451a03; border-radius: 6px; border: 2px solid #290f02;
+            transform-origin: top center; z-index: 1;
+        }
+        .e-leg.l { left: 18px; }
+        .e-leg.r { right: 18px; }
+
+        .avatar-idle .e-body-group { animation: breathe 2s ease-in-out infinite; }
+        .avatar-idle .e-eye { animation: blink 4s infinite; }
+        
+        .avatar-walk .e-body-group { animation: walk-bounce 0.4s ease-in-out infinite alternate; }
+        .avatar-walk .e-leg.l { animation: walk-leg-l 0.4s ease-in-out infinite alternate; }
+        .avatar-walk .e-leg.r { animation: walk-leg-r 0.4s ease-in-out infinite alternate-reverse; }
+        .avatar-walk .e-shadow { animation: shadow-pulse 0.4s ease-in-out infinite alternate; }
+
+        .avatar-happy .e-body-group { animation: jump-joy 0.6s ease-out infinite; }
+        .avatar-happy .e-mouth { height: 8px; border: none; background: #451a03; border-radius: 5px; }
+        .avatar-happy .e-shadow { opacity: 0.2; transform: scale(0.6); }
+
+        .avatar-sad .e-head { transform: translateY(5px) rotate(5deg); }
+        .avatar-sad .e-mouth { border-bottom: none; border-top: 2px solid #451a03; top: 26px; }
+
+        .deco { position: absolute; pointer-events: none; transform: translate(-50%, -100%); z-index: 5; }
+        
+        .tree-pine { width: 60px; height: 100px; transform-origin: bottom center; animation: sway 4s ease-in-out infinite alternate; }
+        .tree-pine::before { content:''; position:absolute; bottom:0; left:25px; width:10px; height:20px; background:#5c3a21; border-radius:2px; }
+        .tree-pine::after { content:''; position:absolute; bottom:15px; left:0; width:60px; height:85px; background:linear-gradient(135deg, #4ade80, #15803d); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); filter: drop-shadow(0 5px 2px rgba(0,0,0,0.2)); }
+        
+        .castle-tower { width: 90px; height: 150px; z-index: 6; }
+        .tower-base { position: absolute; bottom: 0; left: 10px; right: 10px; height: 100px; background: #e5e7eb; border: 3px solid #6b7280; border-radius: 5px; background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.05) 10px, rgba(0,0,0,0.05) 20px); box-shadow: inset -10px 0 20px rgba(0,0,0,0.1); }
+        .tower-roof { position: absolute; top: 0; left: 0; width: 90px; height: 60px; background: linear-gradient(135deg, #a78bfa, #6d28d9); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); border-bottom: 4px solid #4c1d95; }
+        .tower-door { position: absolute; bottom: 0; left: 30px; width: 30px; height: 40px; background: #451a03; border-radius: 15px 15px 0 0; }
+
+        .treasure-chest { width: 70px; height: 60px; z-index: 6; cursor: pointer; transition: transform 0.3s; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.3)); }
+        .chest-base { position: absolute; bottom: 0; left: 5px; width: 60px; height: 35px; background: #b45309; border: 3px solid #78350f; border-radius: 5px; box-shadow: inset 0 -5px 0 rgba(0,0,0,0.3); }
+        .chest-lid { position: absolute; top: 5px; left: 5px; width: 60px; height: 25px; background: #d97706; border: 3px solid #78350f; border-radius: 30px 30px 5px 5px; transform-origin: bottom center; transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .chest-lock { position: absolute; top: 22px; left: 30px; width: 10px; height: 12px; background: #fcd34d; border: 2px solid #ca8a04; border-radius: 3px; z-index: 2; }
+        .treasure-chest.open .chest-lid { transform: rotateX(70deg) translateY(-10px); }
+        .treasure-glow { position: absolute; top: -30px; left: -30px; width: 130px; height: 130px; background: radial-gradient(circle, rgba(250,204,21,0.8) 0%, transparent 70%); opacity: 0; pointer-events: none; animation: spin-slow 10s linear infinite; }
+        .treasure-chest.open .treasure-glow { opacity: 1; }
+
+        #quiz-overlay {
+            position: fixed; inset: 0; z-index: 100;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        #quiz-overlay.active { opacity: 1; pointer-events: auto; }
+
+        .parchment-board {
+            width: 95%; max-width: 800px; max-height: 90vh;
+            background: #fef3c7;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4), inset 0 0 30px rgba(217, 119, 6, 0.1);
+            border: 8px solid #b45309;
+            position: relative;
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            display: flex; flex-direction: column;
+        }
+        #quiz-overlay.active .parchment-board { transform: scale(1) translateY(0); }
+
+        .quiz-header {
+            background: #b45309; color: #fef3c7;
+            padding: 15px 20px; border-radius: 10px 10px 0 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            position: relative; overflow: hidden;
+        }
+        
+        .quiz-header.theme-forest { background: #065f46; }
+        .quiz-header.theme-castle { background: #4c1d95; }
+
+        .option-btn {
+            background: white; border: 4px solid #e5e7eb; border-radius: 16px;
+            padding: 16px 20px; font-size: 1.125rem; font-weight: 700; color: #374151;
+            text-align: left; cursor: pointer; position: relative;
+            box-shadow: 0 6px 0 #d1d5db;
+            transition: all 0.15s ease;
+            display: flex; align-items: center;
+        }
+        .option-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 0 #d1d5db; border-color: #93c5fd; }
+        .option-btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 2px 0 #d1d5db; }
+        .option-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+        
+        .option-letter {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 36px; height: 36px; background: #f3f4f6; color: #6b7280;
+            border-radius: 10px; margin-right: 15px; font-family: 'Fredoka'; font-size: 1.25rem;
+            box-shadow: inset 0 -2px 0 rgba(0,0,0,0.1);
+        }
+
+        .option-btn.correct {
+            background: #ecfdf5; border-color: #10b981; color: #065f46;
+            box-shadow: 0 6px 0 #059669, 0 0 20px rgba(16,185,129,0.4); z-index: 10;
+            opacity: 1;
+        }
+        .option-btn.correct .option-letter { background: #10b981; color: white; }
+        
+        .option-btn.incorrect {
+            background: #fef2f2; border-color: #ef4444; color: #991b1b;
+            box-shadow: 0 6px 0 #b91c1c; opacity: 1;
+            animation: shake 0.4s;
+        }
+        .option-btn.incorrect .option-letter { background: #ef4444; color: white; }
+
+        .hud-panel {
+            position: fixed; top: 15px; z-index: 50;
+            background: white; border: 4px solid #e5e7eb; border-radius: 20px;
+            padding: 10px 20px; font-family: 'Fredoka'; font-weight: 700;
+            box-shadow: 0 6px 0 #d1d5db, 0 10px 15px rgba(0,0,0,0.1);
+            display: flex; align-items: center; gap: 15px;
+        }
+        .hud-left { left: 15px; }
+        .hud-right { right: 15px; border-color: #fde047; box-shadow: 0 6px 0 #eab308, 0 10px 15px rgba(0,0,0,0.1); }
+
+        .btn-primary {
+            background: #3b82f6; color: white; border: none; border-radius: 16px;
+            padding: 12px 24px; font-family: 'Fredoka'; font-size: 1.25rem; font-weight: 700;
+            box-shadow: 0 6px 0 #2563eb; cursor: pointer; transition: all 0.15s ease; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #2563eb; background: #60a5fa; }
+        .btn-primary:active { transform: translateY(4px); box-shadow: 0 2px 0 #2563eb; }
+        .btn-success { background: #10b981; box-shadow: 0 6px 0 #059669; }
+        .btn-success:hover { background: #34d399; box-shadow: 0 8px 0 #059669; }
+
+        .particle { position: fixed; pointer-events: none; z-index: 9999; animation: flyOut 1s ease-out forwards; }
+        
+        .cloud { position: absolute; background: rgba(255,255,255,0.8); border-radius: 50px; filter: blur(4px); animation: float-cloud linear infinite; z-index: 0; pointer-events: none; }
+        .firefly { position: absolute; width: 4px; height: 4px; background: #fef08a; border-radius: 50%; box-shadow: 0 0 8px 3px #facc15; animation: firefly-wander 3s ease-in-out infinite alternate; z-index: 4; pointer-events: none; }
+
+        @keyframes pulse-glow { 0%, 100% { box-shadow: inset 0 -4px 0 rgba(202,138,4,0.6), 0 6px 12px rgba(0,0,0,0.4), 0 0 5px rgba(250, 204, 21, 0.4); transform: translate(-50%, -50%) scale(1); } 50% { box-shadow: inset 0 -4px 0 rgba(202,138,4,0.6), 0 6px 12px rgba(0,0,0,0.4), 0 0 25px rgba(250, 204, 21, 0.8); transform: translate(-50%, -50%) scale(1.05); } }
+        @keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.3); } 100% { transform: scale(1); } }
+        @keyframes breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.05) translateY(-2px); } }
+        @keyframes blink { 0%, 96%, 100% { transform: scaleY(1); } 98% { transform: scaleY(0.1); } }
+        @keyframes walk-bounce { 0% { transform: translateY(0); } 100% { transform: translateY(-8px); } }
+        @keyframes walk-leg-l { 0% { transform: rotate(-20deg); } 100% { transform: rotate(30deg); } }
+        @keyframes walk-leg-r { 0% { transform: rotate(30deg); } 100% { transform: rotate(-20deg); } }
+        @keyframes shadow-pulse { 0% { transform: scale(1); opacity: 0.3; } 100% { transform: scale(0.8); opacity: 0.1; } }
+        @keyframes jump-joy { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-25px); } 60% { transform: translateY(-25px); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 50% { transform: translateX(8px); } 75% { transform: translateX(-8px); } }
+        @keyframes flyOut { 0% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; } 100% { transform: translate(var(--tx), var(--ty)) scale(0) rotate(180deg); opacity: 0; } }
+        @keyframes spin-slow { 100% { transform: rotate(360deg); } }
+        @keyframes float-up { 0% { transform: translateY(20px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+        @keyframes sway { 0% { transform: rotate(-3deg); } 100% { transform: rotate(3deg); } }
+        @keyframes float-cloud { from { transform: translateX(0); } to { transform: translateX(1800px); } }
+        @keyframes firefly-wander { 0% { transform: translate(0, 0); opacity: 0.2; } 50% { opacity: 0.8; } 100% { transform: translate(20px, -30px); opacity: 0.2; } }
+
+        #start-screen { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.95); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <button onclick="openTeacherLogin()" class="absolute top-4 right-4 bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl transition shadow-lg flex items-center gap-2 z-10 text-sm">
+            <i class="fa-solid fa-user-tie"></i> 老师专用
+        </button>
+        <div class="text-center max-w-lg p-8 bg-parchment rounded-3xl border-8 border-wood shadow-2xl relative">
+            <div class="absolute -top-16 left-1/2 transform -translate-x-1/2 w-32 h-32 bg-yellow-400 rounded-full border-4 border-yellow-600 flex items-center justify-center shadow-lg">
+                <i class="fa-solid fa-map-location-dot text-6xl text-yellow-800"></i>
+            </div>
+            <h1 class="text-3xl md:text-4xl text-wood mt-12 mb-4 leading-tight">English Grammar Adventure</h1>
+            <h2 class="text-xl md:text-2xl text-yellow-700 mb-2 font-bold">The Lost Treasure</h2>
+            <div class="inline-flex items-center gap-2 bg-green-100 text-green-800 text-xs font-black px-3 py-1 rounded-full mb-4 border border-green-300 shadow-sm">
+                <i class="fa-solid fa-infinity"></i> 无限期永久有效 · 无限次练习模式
+            </div>
+            <p class="text-gray-700 font-sans font-semibold mb-8">Year 5 Explorers, are you ready to test your grammar skills and find the hidden treasure?</p>
+            <div class="mb-5 text-left">
+                <label for="student-name" class="block font-bold text-gray-700 mb-2">Student Name</label>
+                <input type="text" id="student-name" placeholder="Enter your full name" autocomplete="name" class="w-full border-2 border-gray-300 rounded-xl p-3 text-lg" required>
+
+                <label for="moe-account" class="block font-bold text-gray-700 mt-4 mb-2">MOE Account</label>
+                <input type="email" id="moe-account" placeholder="Enter your MOE email address" autocomplete="email" class="w-full border-2 border-gray-300 rounded-xl p-3 text-lg" required>
+            </div>
+
+            <button onclick="startGame()" class="btn-primary btn-success w-full text-2xl py-4 animate-bounce">
+                Start Adventure <i class="fa-solid fa-play ml-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="hud-panel hud-left hidden sm:flex">
+        <button id="btn-bgm" onclick="toggleBGM()" class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition" title="Toggle Music">
+            <i class="fa-solid fa-music"></i>
+        </button>
+        <button id="btn-sfx" onclick="toggleSFX()" class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition" title="Toggle Sound">
+            <i class="fa-solid fa-volume-high"></i>
+        </button>
+        <div class="flex flex-col ml-2">
+            <span class="text-xs text-gray-500 uppercase">Explorer</span>
+            <span class="text-lg text-gray-800">Year 5</span>
+        </div>
+    </div>
+
+    <div class="hud-panel hud-right">
+        <div class="text-center px-3 border-r-2 border-yellow-200">
+            <div class="text-xs text-yellow-600 uppercase font-black">Score</div>
+            <div class="text-2xl text-yellow-500 font-black"><i class="fa-solid fa-medal mr-1 text-xl"></i><span id="ui-score">0</span></div>
+        </div>
+        <div class="text-center px-2 border-r-2 border-yellow-200">
+            <div class="text-xs text-yellow-600 uppercase font-black">Stars</div>
+            <div class="text-2xl text-yellow-500 font-black"><i class="fa-solid fa-star mr-1 text-xl"></i><span id="ui-stars">0</span></div>
+        </div>
+        <button onclick="openTeacherLogin()" class="bg-purple-600 hover:bg-purple-700 text-white text-xs md:text-sm font-bold px-3 py-2 rounded-xl transition shadow flex items-center gap-1">
+            <i class="fa-solid fa-user-tie"></i> 老师专用
+        </button>
+    </div>
+
+    <div id="map-viewport">
+        <div id="map-world">
+            <div class="map-bg-elements"></div>
+            <svg id="map-svg" class="map-path" viewBox="0 0 1600 1000"></svg>
+            <div id="decorations-layer"></div>
+            <div id="nodes-layer"></div>
+
+            <div id="treasure-chest" class="deco treasure-chest" style="left: 1450px; top: 150px;">
+                <div class="treasure-glow"></div>
+                <div class="chest-base"></div>
+                <div class="chest-lid"><div class="chest-lock"></div></div>
+            </div>
+
+            <div id="avatar" class="avatar-idle">
+                <div class="explorer">
+                    <div class="e-shadow"></div>
+                    <div class="e-body-group">
+                        <div class="e-leg l"></div><div class="e-leg r"></div>
+                        <div class="e-backpack"></div><div class="e-body"><div class="e-belt"></div></div>
+                        <div class="e-head">
+                            <div class="e-hat"><div class="e-hat-brim"></div></div>
+                            <div class="e-face">
+                                <div class="e-eye l"></div><div class="e-eye r"></div>
+                                <div class="e-blush l"></div><div class="e-blush r"></div>
+                                <div class="e-mouth"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="quiz-overlay">
+        <div id="quiz-buddy" class="hidden lg:block absolute left-[10%] bottom-[20%] w-32 h-40 transform scale-150 z-50">
+             <div class="explorer avatar-idle">
+                <div class="e-shadow"></div>
+                <div class="e-body-group">
+                    <div class="e-leg l"></div><div class="e-leg r"></div>
+                    <div class="e-backpack"></div><div class="e-body"><div class="e-belt"></div></div>
+                    <div class="e-head">
+                        <div class="e-hat"><div class="e-hat-brim"></div></div>
+                        <div class="e-face"><div class="e-eye l"></div><div class="e-eye r"></div><div class="e-blush l"></div><div class="e-blush r"></div><div class="e-mouth"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="parchment-board">
+            <div id="quiz-header" class="quiz-header theme-forest flex justify-between items-center shrink-0">
+                <div>
+                    <div class="text-sm font-bold text-white opacity-80 uppercase tracking-wider" id="region-title">Level 1: The Question Forest</div>
+                    <div class="text-xl md:text-2xl font-black mt-1">Question <span id="q-num">1</span></div>
+                </div>
+                <button onclick="closeQuiz()" class="w-10 h-10 rounded-full bg-black bg-opacity-20 hover:bg-opacity-40 transition flex items-center justify-center text-white">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 md:p-8 flex-grow overflow-y-auto font-sans flex flex-col">
+                <h3 id="question-text" class="text-2xl md:text-3xl font-bold text-wood mb-8 leading-snug">Question text?</h3>
+                <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 flex-grow"></div>
+
+                <div id="feedback-container" class="hide bg-white bg-opacity-70 rounded-xl p-5 border-2 mt-auto">
+                    <div class="flex items-start gap-4">
+                        <div id="feedback-icon" class="text-3xl mt-1"></div>
+                        <div class="flex-grow">
+                            <h4 id="feedback-title" class="font-display text-xl font-bold mb-1"></h4>
+                            <p id="feedback-answer" class="text-sm font-bold text-gray-800 mb-2"></p>
+                            <p id="feedback-explanation" class="text-sm text-gray-700 bg-white p-3 rounded border shadow-sm"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 text-right">
+                    <button id="next-btn" onclick="handleNextClick()" class="hide btn-primary w-full md:w-auto">
+                        Continue <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="transition-screen" class="hide fixed inset-0 z-[200] bg-black bg-opacity-90 flex items-center justify-center backdrop-blur-sm p-4">
+        <div class="bg-castle-dark rounded-3xl border-8 border-castle-border p-8 md:p-12 text-center max-w-xl w-full text-white shadow-2xl" style="animation: float-up 0.5s ease-out">
+            <div class="text-7xl text-yellow-400 mb-6 drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]"><i class="fa-brands fa-fort-awesome animate-bounce"></i></div>
+            <h2 class="text-4xl font-display font-black mb-4">Forest Conquered!</h2>
+            <p class="text-xl text-castle-light mb-8 font-sans font-semibold">You have mastered present continuous questions. The gates to <span class="text-yellow-300 font-bold">The Grammar Castle</span> are now open!</p>
+            <button onclick="closeTransition()" class="btn-primary w-full text-xl py-4 bg-yellow-500 shadow-[0_6px_0_#ca8a04] hover:bg-yellow-400 text-wood">
+                Enter Castle Region <i class="fa-solid fa-key ml-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <div id="results-screen" class="hide fixed inset-0 z-[200] bg-slate-900 bg-opacity-95 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-parchment rounded-3xl border-8 border-wood p-8 text-center max-w-2xl w-full shadow-2xl relative my-8" style="animation: float-up 0.5s ease-out">
+            <div class="absolute -top-16 left-1/2 transform -translate-x-1/2 text-8xl text-yellow-400 drop-shadow-xl animate-bounce"><i class="fa-solid fa-crown"></i></div>
+            <h2 class="text-4xl font-display font-black text-wood mb-2 mt-6">Treasure Found!</h2>
+            <p id="final-msg" class="text-2xl font-bold text-green-600 mb-8 font-sans"></p>
+
+            <div class="grid grid-cols-2 gap-4 w-full mb-8 font-sans">
+                <div class="bg-white p-4 rounded-2xl border-2 border-gray-200 shadow-sm flex flex-col items-center">
+                    <span class="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Final Score</span>
+                    <span id="final-score" class="text-4xl font-display font-black text-blue-600">0</span>
+                </div>
+                <div class="bg-white p-4 rounded-2xl border-2 border-gray-200 shadow-sm flex flex-col items-center">
+                    <span class="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Percentage</span>
+                    <span id="final-pct" class="text-4xl font-display font-black text-yellow-500">0%</span>
+                </div>
+                <div class="bg-green-50 p-3 rounded-xl border border-green-200 flex flex-col items-center">
+                    <span class="text-xs text-green-600 font-bold uppercase tracking-wider">Correct</span>
+                    <span id="final-correct" class="text-xl font-bold text-green-700">0</span>
+                </div>
+                <div class="bg-red-50 p-3 rounded-xl border border-red-200 flex flex-col items-center">
+                    <span class="text-xs text-red-600 font-bold uppercase tracking-wider">Incorrect</span>
+                    <span id="final-incorrect" class="text-xl font-bold text-red-700">0</span>
+                </div>
+            </div>
+
+            <div class="bg-gray-100 p-5 rounded-xl border-2 border-gray-200 mb-8 text-left font-sans">
+                <h4 class="font-bold text-gray-800 mb-2 border-b-2 border-gray-200 pb-2 flex items-center">
+                    <i class="fa-solid fa-clipboard-check mr-2 text-blue-600"></i> Assessment Status
+                </h4>
+                <div id="teacher-link-container"></div>
+            </div>
+
+            <div class="bg-yellow-50 p-5 rounded-xl border-2 border-yellow-200 mb-8 text-left font-sans">
+                <h4 class="font-bold text-yellow-800 mb-3 border-b-2 border-yellow-200 pb-2 flex items-center justify-between">
+                    <span><i class="fa-solid fa-trophy text-yellow-500 mr-2"></i> 实时英雄榜 (Leaderboard)</span>
+                    <span class="text-xs text-yellow-600 font-normal">实时数据存留</span>
+                </h4>
+                <div id="public-leaderboard" class="max-h-48 overflow-y-auto space-y-2 text-sm">
+                    <p class="text-gray-500 text-center py-4"><i class="fa-solid fa-spinner fa-spin mr-2"></i>加载排行榜中...</p>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-4 font-sans">
+                <button onclick="showReview()" class="flex-1 bg-white border-4 border-gray-200 hover:border-gray-300 text-gray-700 font-bold py-3 px-6 rounded-xl shadow-sm transition">
+                    <i class="fa-solid fa-list-check mr-2"></i> Review Answers
+                </button>
+                <button onclick="restartGame()" class="flex-1 btn-primary btn-success">
+                    <i class="fa-solid fa-rotate-right mr-2"></i> Play Again
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="teacher-modal" class="hide fixed inset-0 z-[300] bg-black bg-opacity-80 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full border-4 border-purple-600 shadow-2xl relative font-sans">
+            <button onclick="closeTeacherLogin()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl"><i class="fa-solid fa-xmark"></i></button>
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 text-3xl mx-auto mb-3">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <h3 class="text-2xl font-bold font-display text-gray-800">老师专用通道</h3>
+                <p class="text-sm text-gray-500 mt-1">请输入教师管理密码以查看成绩榜单</p>
+            </div>
+            <div class="mb-4">
+                <input type="password" id="teacher-pwd-input" placeholder="请输入密码" class="w-full border-2 border-gray-300 rounded-xl p-3 text-center text-lg focus:border-purple-500 focus:outline-none">
+                <p id="pwd-error" class="text-red-500 text-xs mt-2 text-center hide font-bold"><i class="fa-solid fa-circle-exclamation mr-1"></i>密码错误，请重试！</p>
+            </div>
+            <button onclick="verifyTeacherPassword()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition text-lg shadow-md">
+                验证登录
+            </button>
+        </div>
+    </div>
+
+    <div id="teacher-dashboard" class="hide fixed inset-0 z-[310] bg-gray-900 bg-opacity-95 flex flex-col font-sans p-4 md:p-8">
+        <div class="max-w-6xl w-full mx-auto bg-white rounded-3xl shadow-2xl flex flex-col h-full overflow-hidden">
+            <div class="bg-purple-700 text-white p-5 flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-graduation-cap text-3xl"></i>
+                    <div>
+                        <h2 class="text-2xl font-bold font-display">教师管理后台 - 学生成绩榜单</h2>
+                        <p class="text-xs text-purple-200">Firebase 实时记录</p>
+                    </div>
+                </div>
+                <button onclick="closeTeacherDashboard()" class="bg-purple-800 hover:bg-purple-900 text-white font-bold px-4 py-2 rounded-xl transition text-sm">
+                    退出后台 <i class="fa-solid fa-right-from-bracket ml-1"></i>
+                </button>
+            </div>
+            
+            <div class="p-4 bg-purple-50 border-b border-purple-100 flex flex-wrap justify-between items-center gap-4 text-sm">
+                <div class="flex items-center gap-4">
+                    <span class="font-bold text-gray-700">总计已提交：<span id="dashboard-total-count" class="text-purple-700 font-extrabold text-lg">0</span> 人</span>
+                    <span class="text-xs bg-green-200 text-green-900 px-2 py-1 rounded-md font-bold"><i class="fa-solid fa-infinity mr-1"></i>无限期永久存储 (Local + Cloud)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="exportScoresToCSV()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1 shadow">
+                        <i class="fa-solid fa-file-excel mr-1"></i> 导出 CSV (永久备份)
+                    </button>
+                    <button onclick="loadLeaderboardData()" class="bg-white border border-purple-300 text-purple-700 hover:bg-purple-100 px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1">
+                        <i class="fa-solid fa-rotate mr-1"></i> 刷新数据
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="review-screen" class="hide fixed inset-0 z-[210] bg-gray-100 flex flex-col font-sans">
+        <div class="bg-wood text-parchment p-4 sticky top-0 z-10 flex justify-between items-center shadow-md">
+            <h2 class="text-2xl font-bold font-display"><i class="fa-solid fa-list-check mr-2"></i> Review Question Answers</h2>
+            <button onclick="closeReview()" class="btn-primary bg-yellow-500 hover:bg-yellow-400 text-wood text-sm py-2 px-4">
+                Back to Results <i class="fa-solid fa-arrow-right ml-1"></i>
+            </button>
+        </div>
+        <div class="p-6 flex-grow overflow-y-auto max-w-4xl mx-auto w-full">
+            <div id="review-list" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'english-grammar-adventure';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyCcCIFsm4vFrhHSbgt0qr2dCYOIcaT6Mt8",
+            authDomain: "english-y5grammar1.firebaseapp.com",
+            projectId: "english-y5grammar1",
+            storageBucket: "english-y5grammar1.firebasestorage.app",
+            messagingSenderId: "937831039019",
+            appId: "1:937831039019:web:f30ed89548f33bc5856a6e"
+        };
+
+        let app, db, auth, currentUser = null;
+
+        async function initFirebase() {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    const userCredential = await signInWithCustomToken(auth, __initial_auth_token);
+                    currentUser = userCredential.user;
+                } else {
+                    const userCredential = await signInAnonymously(auth);
+                    currentUser = userCredential.user;
+                }
+            } catch (err) {
+                console.warn("Firebase Auth warning:", err);
+            }
+        }
+
+        window.saveScoreToFirebase = async function(studentData) {
+            const newRecord = {
+                ...studentData,
+                id: 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                timestamp: Date.now(),
+                dateStr: new Date().toLocaleString()
+            };
+
+            // 1. 无限期保存到本地 LocalStorage（永不过期，离线/在线均保留）
+            try {
+                const localScores = JSON.parse(localStorage.getItem('eg_adventure_scores') || '[]');
+                localScores.push(newRecord);
+                localStorage.setItem('eg_adventure_scores', JSON.stringify(localScores));
+            } catch(e) {
+                console.warn("LocalStorage save error:", e);
+            }
+
+            // 2. 同步保存到 Firebase 云端
+            if (!db) await initFirebase();
+            if (currentUser) {
+                try {
+                    const scoreCollection = collection(db, 'artifacts', appId, 'public', 'data', 'scores');
+                    await addDoc(scoreCollection, newRecord);
+                } catch (e) {
+                    console.error("Error saving score to Firebase:", e);
+                }
+            }
+        };
+
+        window.fetchScoresFromFirebase = async function() {
+            let allScores = [];
+
+            // 1. 从本地 LocalStorage 读取（永久无限期保留）
+            try {
+                const localScores = JSON.parse(localStorage.getItem('eg_adventure_scores') || '[]');
+                allScores = [...localScores];
+            } catch(e) {
+                console.warn("LocalStorage fetch error:", e);
+            }
+
+            // 2. 从 Firebase 获取并进行云端+本地去重合并
+            if (!db) await initFirebase();
+            if (currentUser) {
+                try {
+                    const scoreCollection = collection(db, 'artifacts', appId, 'public', 'data', 'scores');
+                    const snapshot = await getDocs(scoreCollection);
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (!allScores.some(s => s.timestamp === data.timestamp && s.studentName === data.studentName)) {
+                            allScores.push({ id: doc.id, ...data });
+                        }
+                    });
+                } catch (e) {
+                    console.error("Error fetching scores from Firebase:", e);
+                }
+            }
+
+            allScores.sort((a, b) => (b.score || 0) - (a.score || 0) || (b.percentage || 0) - (a.percentage || 0));
+            return allScores;
+        };
+
+        // 一键导出 CSV（永久备份到本地电脑）
+        window.exportScoresToCSV = async function() {
+            const scores = await window.fetchScoresFromFirebase();
+            if (!scores.length) {
+                alert("当前暂无成绩数据可导出！");
+                return;
+            }
+            let csvContent = "\uFEFF排名,学生姓名,MOE账号,分数,正确率,正确题数,错误题数,提交时间\n";
+            scores.forEach((s, idx) => {
+                csvContent += `"${idx + 1}","${s.studentName || ''}","${s.moeAccount || ''}","${s.score || 0}","${s.percentage || 0}%","${s.correctCount || 0}","${s.incorrectCount || 0}","${s.dateStr || ''}"\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Grammar_Adventure_Scores_Backup_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+
+        initFirebase();
+    </script>
+
+    <script>
+        const TEACHER_PASSWORD = "2020Hui%%";
+        const TEACHER_ASSESSMENT_URL = "";
+
+        // Global Game State Definition
+        let state = {
+            unlockedLevel: 0,
+            currentQuizIndex: 0,
+            answers: new Array(20).fill(null),
+            score: 0,
+            stars: 0,
+            bgmEnabled: true,
+            sfxEnabled: true
+        };
+
+        // Audio System State
+        let audioCtx = null;
+        let masterGain = null;
+        let audioInitialized = false;
+        let isPlayingBgm = false;
+        let currentStep = 0;
+        let nextNoteTime = 0;
+        let bgmTimer = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) {
+                    audioCtx = new AudioContext();
+                    masterGain = audioCtx.createGain();
+                    masterGain.gain.value = 0.3;
+                    masterGain.connect(audioCtx.destination);
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function mtof(note) {
+            return 440 * Math.pow(2, (note - 69) / 12);
+        }
+
+        // Map Node Coordinates (20 Nodes: Forest 1-10, Castle 11-20)
+        const nodeCoords = [
+            { x: 150, y: 820 }, { x: 280, y: 740 }, { x: 420, y: 800 }, { x: 560, y: 700 }, { x: 680, y: 780 },
+            { x: 810, y: 670 }, { x: 940, y: 740 }, { x: 1080, y: 620 }, { x: 1220, y: 700 }, { x: 1350, y: 620 },
+            { x: 1100, y: 480 }, { x: 950, y: 420 }, { x: 800, y: 460 }, { x: 650, y: 390 }, { x: 500, y: 440 },
+            { x: 350, y: 330 }, { x: 500, y: 230 }, { x: 750, y: 260 }, { x: 1050, y: 210 }, { x: 1400, y: 180 }
+        ];
+
+        // 20 Year 5 English Grammar Questions
+        const questions = [
+            { q: "Is he _____ a book right now?", options: ["A. read", "B. reading", "C. reads", "D. readed"], correctIndex: 1, correctText: "reading", explanation: "With 'Is', we use the present continuous form (verb + ing)." },
+            { q: "_____ they playing basketball in the court?", options: ["A. Is", "B. Are", "C. Am", "D. Do"], correctIndex: 1, correctText: "Are", explanation: "Use 'Are' for plural subject 'they' in present continuous questions." },
+            { q: "What _____ you doing at this moment?", options: ["A. is", "B. are", "C. am", "D. was"], correctIndex: 1, correctText: "are", explanation: "'you' takes 'are' in present continuous questions." },
+            { q: "_____ she cooking dinner for the family?", options: ["A. Are", "B. Is", "C. Am", "D. Does"], correctIndex: 1, correctText: "Is", explanation: "'she' is singular, so start with 'Is'." },
+            { q: "Where _____ the children running to?", options: ["A. is", "B. are", "C. am", "D. do"], correctIndex: 1, correctText: "are", explanation: "'children' is plural, so we use 'are'." },
+            { q: "Why _____ he crying so loudly?", options: ["A. are", "B. am", "C. is", "D. do"], correctIndex: 2, correctText: "is", explanation: "'he' takes 'is' in present continuous questions." },
+            { q: "Is the dog _____ in the garden?", options: ["A. bark", "B. barks", "C. barking", "D. barked"], correctIndex: 2, correctText: "barking", explanation: "Present continuous uses verb + ing after 'Is'." },
+            { q: "_____ I doing this exercise correctly?", options: ["A. Am", "B. Is", "C. Are", "D. Do"], correctIndex: 0, correctText: "Am", explanation: "'I' uses 'Am' in continuous question structures." },
+            { q: "Who _____ listening to music in the living room?", options: ["A. are", "B. is", "C. am", "D. be"], correctIndex: 1, correctText: "is", explanation: "'Who' singular takes 'is'." },
+            { q: "Are we _____ to the beach today?", options: ["A. go", "B. went", "C. going", "D. gone"], correctIndex: 2, correctText: "going", explanation: "'Are we...' requires the -ing form 'going'." },
+            { q: "_____ it raining heavily outside?", options: ["A. Are", "B. Is", "C. Do", "D. Am"], correctIndex: 1, correctText: "Is", explanation: "'it' takes 'Is' in present continuous." },
+            { q: "What are the students _____ in the science lab?", options: ["A. study", "B. studied", "C. studying", "D. studies"], correctIndex: 2, correctText: "studying", explanation: "After 'are the students', use verb + ing." },
+            { q: "_____ you listening to the teacher carefully?", options: ["A. Is", "B. Are", "C. Am", "D. Does"], correctIndex: 1, correctText: "Are", explanation: "Questions starting with 'you' use 'Are'." },
+            { q: "Why is she _____ her homework late tonight?", options: ["A. do", "B. did", "C. doing", "D. done"], correctIndex: 2, correctText: "doing", explanation: "'is she...' takes 'doing'." },
+            { q: "Where _____ they having their lunch right now?", options: ["A. are", "B. is", "C. am", "D. do"], correctIndex: 0, correctText: "are", explanation: "'they' requires 'are'." },
+            { q: "_____ he writing a story for the competition?", options: ["A. Is", "B. Are", "C. Am", "D. Do"], correctIndex: 0, correctText: "Is", explanation: "'he' requires 'Is'." },
+            { q: "What are you _____ for in your bag?", options: ["A. look", "B. looking", "C. looked", "D. looks"], correctIndex: 1, correctText: "looking", explanation: "'are you...' takes 'looking'." },
+            { q: "Is the cat _____ on the soft cushion?", options: ["A. sleep", "B. slept", "C. sleeping", "D. sleeps"], correctIndex: 2, correctText: "sleeping", explanation: "'Is the cat...' needs 'sleeping'." },
+            { q: "Why _____ we waiting in this long queue?", options: ["A. is", "B. are", "C. am", "D. do"], correctIndex: 1, correctText: "are", explanation: "'we' takes 'are'." },
+            { q: "Are the birds _____ high up in the blue sky?", options: ["A. fly", "B. flew", "C. flying", "D. flown"], correctIndex: 2, correctText: "flying", explanation: "'Are the birds...' requires 'flying'." }
+        ];
+
+        function openTeacherLogin() {
+            playSound('click');
+            document.getElementById('teacher-pwd-input').value = '';
+            document.getElementById('pwd-error').classList.add('hide');
+            document.getElementById('teacher-modal').classList.remove('hide');
+        }
+
+        function closeTeacherLogin() {
+            playSound('click');
+            document.getElementById('teacher-modal').classList.add('hide');
+        }
+
+        function verifyTeacherPassword() {
+            const input = document.getElementById('teacher-pwd-input').value;
+            if (input === TEACHER_PASSWORD) {
+                playSound('correct');
+                document.getElementById('teacher-modal').classList.add('hide');
+                document.getElementById('teacher-dashboard').classList.remove('hide');
+                loadLeaderboardData();
+            } else {
+                playSound('incorrect');
+                document.getElementById('pwd-error').classList.remove('hide');
+            }
+        }
+
+        function closeTeacherDashboard() {
+            playSound('click');
+            document.getElementById('teacher-dashboard').classList.add('hide');
+        }
+
+        async function loadLeaderboardData() {
+            const tbody = document.getElementById('teacher-table-body');
+            const publicBoard = document.getElementById('public-leaderboard');
+
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-gray-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>正在载入 Firebase 数据...</td></tr>`;
+            if (publicBoard) {
+                publicBoard.innerHTML = `<p class="text-gray-500 text-center py-4"><i class="fa-solid fa-spinner fa-spin mr-2"></i>加载排行榜中...</p>`;
+            }
+
+            const scores = await window.fetchScoresFromFirebase();
+            document.getElementById('dashboard-total-count').innerText = scores.length;
+
+            if (scores.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-gray-400">暂无答题记录</td></tr>`;
+                if (publicBoard) publicBoard.innerHTML = `<p class="text-gray-400 text-center py-3">尚无榜单记录，快成为第一个打榜英雄吧！</p>`;
+                return;
+            }
+
+            tbody.innerHTML = '';
+            scores.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                tr.innerHTML = `
+                    <td class="p-3 font-bold ${index < 3 ? 'text-yellow-600' : 'text-gray-500'}">#${index + 1}</td>
+                    <td class="p-3 font-bold text-gray-800">${escapeHtml(item.studentName || '匿名')}</td>
+                    <td class="p-3 text-gray-500">${escapeHtml(item.moeAccount || '-')}</td>
+                    <td class="p-3 font-extrabold text-blue-600">${item.score || 0} pts</td>
+                    <td class="p-3 font-bold text-yellow-600">${item.percentage || 0}%</td>
+                    <td class="p-3"><span class="text-green-600 font-bold">${item.correctCount || 0}</span> / <span class="text-red-500 font-bold">${item.incorrectCount || 0}</span></td>
+                    <td class="p-3 text-xs text-gray-400">${item.dateStr || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            if (publicBoard) {
+                publicBoard.innerHTML = '';
+                scores.slice(0, 10).forEach((item, index) => {
+                    const row = document.createElement('div');
+                    row.className = "flex items-center justify-between p-2 rounded-lg bg-white border border-yellow-100 shadow-sm";
+                    row.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${index === 0 ? 'bg-yellow-400 text-yellow-900' : index === 1 ? 'bg-gray-300 text-gray-800' : index === 2 ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-600'}">${index + 1}</span>
+                            <span class="font-bold text-gray-800">${escapeHtml(item.studentName || '匿名')}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="font-extrabold text-blue-600 text-sm">${item.score || 0} pts</span>
+                            <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold">${item.percentage || 0}%</span>
+                        </div>
+                    `;
+                    publicBoard.appendChild(row);
+                });
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+        }
+
+        function initAudio() {
+            if (audioInitialized) return;
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            
+            try {
+                const buffer = ctx.createBuffer(1, 1, 22050);
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(masterGain);
+                if (source.start) source.start(0); else source.noteOn(0);
+                audioInitialized = true;
+            } catch(e) {
+                console.warn("Audio Initialization Failed: ", e);
+            }
+        }
+
+        ['mousedown', 'touchstart', 'keydown', 'click'].forEach(evt => {
+            document.addEventListener(evt, () => {
+                if (!audioInitialized) initAudio();
+            }, { capture: true, once: true });
+        });
+
+        function playTone(freq, type, duration, vol=0.3, startTime=0) {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            
+            try {
+                let time = startTime || ctx.currentTime;
+                if (time <= ctx.currentTime) time = ctx.currentTime + 0.01;
+                
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, time);
+                
+                const actualDuration = Math.max(0.05, duration);
+                
+                gain.gain.setValueAtTime(0, time);
+                gain.gain.linearRampToValueAtTime(vol, time + 0.02);
+                gain.gain.setValueAtTime(vol, time + actualDuration - 0.02);
+                gain.gain.linearRampToValueAtTime(0, time + actualDuration);
+                
+                osc.connect(gain);
+                gain.connect(masterGain);
+                
+                osc.start(time);
+                osc.stop(time + actualDuration + 0.1);
+            } catch (e) {
+                console.warn("Audio scheduling issue:", e);
+            }
+        }
+
+        const bgmPattern = [
+            [69, 72], 76, [69, 72], 76, [69, 72], 76, [69, 72], 76,
+            [65, 69], 72, [65, 69], 72, [65, 69], 72, [65, 69], 72,
+            [60, 64], 67, [60, 64], 67, [60, 64], 67, [60, 64], 67,
+            [67, 71], 74, [67, 71], 74, [67, 71], 74, [67, 71], 74
+        ];
+        const bassPattern = [
+            45, 45, 45, 45,
+            41, 41, 41, 41,
+            48, 48, 48, 48,
+            43, 43, 43, 43
+        ];
+
+        function scheduleNote(step, time) {
+            if (!state.bgmEnabled) return;
+            const mNote = bgmPattern[step];
+            if (Array.isArray(mNote)) {
+                mNote.forEach(n => playTone(mtof(n), 'square', 0.2, 0.25, time));
+            } else if (mNote) {
+                playTone(mtof(mNote), 'square', 0.2, 0.25, time);
+            }
+            if (step % 2 === 0) {
+                const bNote = bassPattern[step / 2];
+                if (bNote) playTone(mtof(bNote), 'triangle', 0.3, 0.3, time);
+            }
+        }
+
+        function nextNote() {
+            const secondsPerBeat = 60.0 / 110.0;
+            const timeStep = secondsPerBeat / 2;
+            nextNoteTime += timeStep;
+            currentStep = (currentStep + 1) % 32;
+        }
+
+        function bgmScheduler() {
+            if (!isPlayingBgm) return;
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            
+            if (nextNoteTime < ctx.currentTime) {
+                nextNoteTime = ctx.currentTime + 0.1;
+            }
+
+            while (nextNoteTime < ctx.currentTime + 0.15) {
+                scheduleNote(currentStep, nextNoteTime);
+                nextNote();
+            }
+            bgmTimer = setTimeout(bgmScheduler, 25);
+        }
+
+        function startBGM() {
+            if (isPlayingBgm) return; 
+            if (!state.bgmEnabled) return;
+            
+            initAudio();
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            
+            isPlayingBgm = true;
+            currentStep = 0;
+            nextNoteTime = ctx.currentTime + 0.1;
+            
+            if (bgmTimer !== null) clearTimeout(bgmTimer);
+            bgmScheduler();
+        }
+
+        function stopBGM() {
+            isPlayingBgm = false;
+            if (bgmTimer !== null) {
+                clearTimeout(bgmTimer);
+                bgmTimer = null;
+            }
+        }
+
+        function playSound(type) {
+            if (!state.sfxEnabled) return;
+            initAudio();
+            
+            const ctx = getAudioContext();
+            const t = ctx ? ctx.currentTime : 0;
+            
+            switch(type) {
+                case 'click':
+                    playTone(mtof(76), 'sine', 0.1, 0.6, t); 
+                    break;
+                case 'correct':
+                    playTone(mtof(72), 'square', 0.15, 0.4, t); 
+                    playTone(mtof(76), 'square', 0.15, 0.4, t + 0.15); 
+                    playTone(mtof(79), 'square', 0.3, 0.4, t + 0.3); 
+                    break;
+                case 'incorrect':
+                    playTone(mtof(50), 'sawtooth', 0.2, 0.5, t); 
+                    playTone(mtof(49), 'sawtooth', 0.4, 0.5, t + 0.2); 
+                    break;
+                case 'winLevel':
+                    playTone(mtof(72), 'square', 0.2, 0.4, t);
+                    playTone(mtof(76), 'square', 0.2, 0.4, t + 0.2);
+                    playTone(mtof(79), 'square', 0.4, 0.4, t + 0.4);
+                    playTone(mtof(84), 'square', 0.6, 0.4, t + 0.6); 
+                    break;
+                case 'treasure':
+                    const arp = [60, 64, 67, 72, 76, 79, 84]; 
+                    arp.forEach((note, i) => {
+                        playTone(mtof(note), 'sine', 0.15, 0.4, t + i * 0.1);
+                    });
+                    playTone(mtof(72), 'square', 0.8, 0.4, t + arp.length * 0.1);
+                    playTone(mtof(76), 'square', 0.8, 0.4, t + arp.length * 0.1 + 0.02);
+                    playTone(mtof(79), 'square', 0.8, 0.4, t + arp.length * 0.1 + 0.04);
+                    break;
+            }
+        }
+
+        function toggleBGM() {
+            state.bgmEnabled = !state.bgmEnabled;
+            const icon = document.querySelector('#btn-bgm i');
+            if (state.bgmEnabled) {
+                icon.className = "fa-solid fa-music";
+                startBGM(); 
+            } else {
+                icon.className = "fa-solid fa-music text-red-500 opacity-75";
+                stopBGM();
+            }
+        }
+
+        function toggleSFX() {
+            state.sfxEnabled = !state.sfxEnabled;
+            const icon = document.querySelector('#btn-sfx i');
+            if (state.sfxEnabled) {
+                icon.className = "fa-solid fa-volume-high";
+                playSound('click'); 
+            } else {
+                icon.className = "fa-solid fa-volume-xmark text-red-500 opacity-75";
+            }
+        }
+
+        function startGame() {
+            initAudio();
+            
+            const studentName = document.getElementById('student-name').value.trim();
+            const moeAccount = document.getElementById('moe-account').value.trim();
+
+            if (!studentName || !moeAccount) {
+                const btn = document.querySelector('#start-screen button.btn-success');
+                const origText = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Fill all fields!';
+                btn.classList.remove('btn-success');
+                btn.classList.add('bg-red-500', 'text-white');
+                setTimeout(() => { btn.innerHTML = origText; btn.classList.remove('bg-red-500', 'text-white'); btn.classList.add('btn-success'); }, 2000);
+                return;
+            }
+
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(moeAccount)) {
+                const btn = document.querySelector('#start-screen button.btn-success');
+                const origText = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Invalid Email!';
+                btn.classList.remove('btn-success');
+                btn.classList.add('bg-red-500', 'text-white');
+                setTimeout(() => { btn.innerHTML = origText; btn.classList.remove('bg-red-500', 'text-white'); btn.classList.add('btn-success'); }, 2000);
+                return;
+            }
+
+            document.getElementById('start-screen').classList.add('hide');
+            
+            if (state.bgmEnabled) {
+                startBGM();
+            }
+            
+            initMap();
+            updateHUD();
+            setAvatarPosition(0, true);
+            playSound('click');
+        }
+
+        function initMap() {
+            const svg = document.getElementById('map-svg');
+            const nodesLayer = document.getElementById('nodes-layer');
+            const decoLayer = document.getElementById('decorations-layer');
+            
+            svg.innerHTML = '';
+            nodesLayer.innerHTML = '';
+            decoLayer.innerHTML = '';
+
+            let pathForestD = `M ${nodeCoords[0].x} ${nodeCoords[0].y}`;
+            let pathCastleD = `M ${nodeCoords[9].x} ${nodeCoords[9].y}`;
+            
+            for(let i=1; i<=9; i++) { pathForestD += ` L ${nodeCoords[i].x} ${nodeCoords[i].y}`; }
+            for(let i=10; i<20; i++) { pathCastleD += ` L ${nodeCoords[i].x} ${nodeCoords[i].y}`; }
+
+            svg.innerHTML += `<path class="path-dirt" d="${pathForestD}" />`;
+            svg.innerHTML += `<path class="path-inner" d="${pathForestD}" />`;
+            
+            if (state.unlockedLevel >= 10) {
+                svg.innerHTML += `<path class="path-castle-dirt" d="${pathCastleD}" />`;
+                svg.innerHTML += `<path class="path-castle-inner" d="${pathCastleD}" />`;
+            }
+
+            const pinePositions = [{x:150, y:650}, {x:250, y:600}, {x:350, y:850}, {x:600, y:650}, {x:700, y:350}, {x:450, y:200}];
+            pinePositions.forEach(pos => {
+                let tree = document.createElement('div');
+                tree.className = 'deco tree-pine';
+                tree.style.left = `${pos.x}px`; tree.style.top = `${pos.y}px`;
+                decoLayer.appendChild(tree);
+            });
+
+            for (let i = 0; i < 6; i++) {
+                let cloud = document.createElement('div');
+                cloud.className = 'cloud';
+                cloud.style.top = `${Math.random() * 400 + 20}px`;
+                cloud.style.left = `-200px`;
+                cloud.style.width = `${Math.random() * 150 + 100}px`;
+                cloud.style.height = `${Math.random() * 40 + 30}px`;
+                cloud.style.animationDuration = `${Math.random() * 30 + 30}s`;
+                cloud.style.animationDelay = `${Math.random() * -30}s`;
+                decoLayer.appendChild(cloud);
+            }
+
+            for (let i = 0; i < 20; i++) {
+                let firefly = document.createElement('div');
+                firefly.className = 'firefly';
+                firefly.style.left = `${Math.random() * 1500 + 50}px`;
+                firefly.style.top = `${Math.random() * 800 + 100}px`;
+                firefly.style.animationDelay = `${Math.random() * -5}s`;
+                decoLayer.appendChild(firefly);
+            }
+
+            let tower = document.createElement('div');
+            tower.className = 'deco castle-tower';
+            tower.style.left = '1050px'; tower.style.top = '720px';
+            tower.innerHTML = '<div class="tower-base"><div class="tower-door"></div></div><div class="tower-roof"></div>';
+            decoLayer.appendChild(tower);
+
+            nodeCoords.forEach((pos, index) => {
+                let node = document.createElement('div');
+                node.id = `node-${index}`;
+                node.className = 'level-node';
+                node.style.left = `${pos.x}px`;
+                node.style.top = `${pos.y}px`;
+                node.innerText = index + 1;
+                
+                if (state.answers[index] !== null) {
+                    node.classList.add('completed');
+                    node.innerHTML += `<i class="fa-solid fa-star star-badge"></i>`;
+                } else if (index === state.unlockedLevel) {
+                    node.classList.add('available', 'current');
+                } else if (index > state.unlockedLevel) {
+                    node.classList.add('locked');
+                    node.innerHTML = `<i class="fa-solid fa-lock text-xl opacity-50"></i>`;
+                }
+
+                if (index >= 10 && state.unlockedLevel < 10) {
+                     node.style.display = 'none';
+                }
+
+                node.onclick = () => handleNodeClick(index);
+                nodesLayer.appendChild(node);
+            });
+        }
+
+        function handleNodeClick(index) {
+            if (index > state.unlockedLevel) return;
+            playSound('click');
+            
+            moveAvatar(index).then(() => {
+                openQuiz(index);
+            });
+        }
+
+        function setAvatarPosition(index, instant = false) {
+            const avatar = document.getElementById('avatar');
+            const pos = nodeCoords[index];
+            if (!pos) return;
+
+            if (instant) {
+                avatar.style.transition = 'none';
+                avatar.style.left = `${pos.x}px`;
+                avatar.style.top = `${pos.y}px`;
+                centerCameraOn(pos.x, pos.y);
+            }
+        }
+
+        function moveAvatar(targetIndex) {
+            return new Promise((resolve) => {
+                const avatar = document.getElementById('avatar');
+                const startPos = { 
+                    x: parseFloat(avatar.style.left) || nodeCoords[0].x, 
+                    y: parseFloat(avatar.style.top) || nodeCoords[0].y 
+                };
+                const targetPos = nodeCoords[targetIndex];
+
+                const dist = Math.hypot(targetPos.x - startPos.x, targetPos.y - startPos.y);
+                const duration = Math.max(0.3, dist / 400);
+
+                if (dist < 10) {
+                    resolve(); 
+                    return;
+                }
+
+                avatar.className = 'avatar-walk';
+                
+                const charInner = avatar.querySelector('.explorer');
+                if (targetPos.x < startPos.x) { charInner.style.transform = 'scaleX(-1)'; } 
+                else { charInner.style.transform = 'scaleX(1)'; }
+
+                avatar.style.transition = `left ${duration}s linear, top ${duration}s linear`;
+                void avatar.offsetWidth; 
+                
+                avatar.style.left = `${targetPos.x}px`;
+                avatar.style.top = `${targetPos.y}px`;
+
+                centerCameraOn(targetPos.x, targetPos.y, true);
+
+                setTimeout(() => {
+                    avatar.className = 'avatar-idle';
+                    resolve();
+                }, duration * 1000);
+            });
+        }
+
+        function centerCameraOn(x, y, smooth = false) {
+            const viewport = document.getElementById('map-viewport');
+            const targetScrollX = x - (viewport.clientWidth / 2);
+            const targetScrollY = y - (viewport.clientHeight / 2);
+            
+            viewport.scrollTo({
+                left: Math.max(0, targetScrollX),
+                top: Math.max(0, targetScrollY),
+                behavior: smooth ? 'smooth' : 'auto'
+            });
+        }
+
+        function openQuiz(index) {
+            state.currentQuizIndex = index;
+            const qData = questions[index];
+            const isAnswered = state.answers[index] !== null;
+            
+            const overlay = document.getElementById('quiz-overlay');
+            const header = document.getElementById('quiz-header');
+            const regionTitle = document.getElementById('region-title');
+            const qText = document.getElementById('question-text');
+            const optContainer = document.getElementById('options-container');
+            const feedbackBox = document.getElementById('feedback-container');
+            const nextBtn = document.getElementById('next-btn');
+            
+            if (index < 10) {
+                header.className = 'quiz-header theme-forest flex justify-between items-center shrink-0';
+                regionTitle.innerText = "Level 1: The Question Forest";
+            } else {
+                header.className = 'quiz-header theme-castle flex justify-between items-center shrink-0';
+                regionTitle.innerText = "Level 2: The Grammar Castle";
+            }
+
+            document.getElementById('q-num').innerText = index + 1;
+            qText.innerText = qData.q;
+            
+            feedbackBox.classList.add('hide');
+            nextBtn.classList.add('hide');
+            optContainer.innerHTML = '';
+
+            const buddy = document.querySelector('#quiz-buddy .explorer');
+            if(buddy) buddy.className = 'explorer avatar-idle';
+
+            qData.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn group';
+                
+                const letter = opt.substring(0, 1);
+                const text = opt.substring(3);
+                
+                btn.innerHTML = `<span class="option-letter group-hover:bg-blue-100 group-hover:text-blue-600 transition">${letter}</span> <span class="flex-grow">${text}</span>`;
+                
+                if (isAnswered) {
+                    btn.disabled = true;
+                    if (optIndex === qData.correctIndex) {
+                        btn.classList.add('correct');
+                    } else if (optIndex === state.answers[index]) {
+                        btn.classList.add('incorrect');
+                    }
+                } else {
+                    btn.onclick = (e) => handleAnswer(optIndex, e.currentTarget);
+                }
+                optContainer.appendChild(btn);
+            });
+
+            if (isAnswered) {
+                showFeedback(qData, state.answers[index] === qData.correctIndex);
+                nextBtn.classList.remove('hide');
+                nextBtn.innerHTML = 'Return to Map <i class="fa-solid fa-map ml-2"></i>';
+            }
+
+            overlay.classList.remove('hide');
+            requestAnimationFrame(() => overlay.classList.add('active'));
+        }
+
+        function handleAnswer(selectedIndex, btnElement) {
+            const index = state.currentQuizIndex;
+            const qData = questions[index];
+            const isCorrect = (selectedIndex === qData.correctIndex);
+            
+            state.answers[index] = selectedIndex;
+            const allBtns = document.querySelectorAll('.option-btn');
+            allBtns.forEach(b => b.disabled = true);
+
+            const buddy = document.querySelector('#quiz-buddy .explorer');
+
+            if (isCorrect) {
+                playSound('correct');
+                state.score += 5;
+                state.stars += 1;
+                btnElement.classList.add('correct');
+                createParticles(btnElement, 'star');
+                if(buddy) buddy.className = 'explorer avatar-happy';
+            } else {
+                playSound('incorrect');
+                btnElement.classList.add('incorrect');
+                allBtns[qData.correctIndex].classList.add('correct');
+                if(buddy) buddy.className = 'explorer avatar-sad';
+            }
+            
+            updateHUD();
+            showFeedback(qData, isCorrect);
+            
+            if (index === state.unlockedLevel) {
+                state.unlockedLevel++;
+            }
+
+            const nextBtn = document.getElementById('next-btn');
+            nextBtn.classList.remove('hide');
+            
+            if (index === 9 && state.unlockedLevel === 10) {
+                nextBtn.innerHTML = 'Unlock Castle <i class="fa-solid fa-key ml-2"></i>';
+                nextBtn.className = "btn-primary bg-yellow-500 shadow-[0_6px_0_#ca8a04] hover:bg-yellow-400 text-wood w-full md:w-auto mt-6";
+            } else if (index === 19 && state.unlockedLevel === 20) {
+                nextBtn.innerHTML = 'Open Treasure! <i class="fa-solid fa-box-open ml-2"></i>';
+                nextBtn.className = "btn-primary bg-yellow-500 shadow-[0_6px_0_#ca8a04] hover:bg-yellow-400 text-wood w-full md:w-auto mt-6";
+            } else {
+                nextBtn.innerHTML = 'Continue Adventure <i class="fa-solid fa-arrow-right ml-2"></i>';
+                nextBtn.className = "btn-primary w-full md:w-auto mt-6";
+            }
+        }
+
+        function showFeedback(qData, isCorrect) {
+            const fbBox = document.getElementById('feedback-container');
+            const fbIcon = document.getElementById('feedback-icon');
+            const fbTitle = document.getElementById('feedback-title');
+            const fbAns = document.getElementById('feedback-answer');
+            const fbExp = document.getElementById('feedback-explanation');
+            
+            fbBox.classList.remove('hide', 'bg-green-50', 'border-green-300', 'bg-red-50', 'border-red-300');
+            
+            if (isCorrect) {
+                fbBox.classList.add('bg-green-50', 'border-green-300');
+                fbIcon.innerHTML = '<i class="fa-solid fa-circle-check text-green-500"></i>';
+                fbTitle.innerText = "Excellent! You earned 5 points!";
+                fbTitle.className = "font-display text-xl font-bold mb-1 text-green-700";
+            } else {
+                fbBox.classList.add('bg-red-50', 'border-red-300');
+                fbIcon.innerHTML = '<i class="fa-solid fa-lightbulb text-orange-500"></i>';
+                fbTitle.innerText = "Good try! Let's learn together!";
+                fbTitle.className = "font-display text-xl font-bold mb-1 text-orange-700";
+            }
+            
+            fbAns.innerHTML = `Correct Answer: <span class="text-green-700">${qData.correctText}</span>`;
+            fbExp.innerText = qData.explanation;
+        }
+
+        function closeQuiz() {
+            playSound('click');
+            const overlay = document.getElementById('quiz-overlay');
+            overlay.classList.remove('active');
+            setTimeout(() => overlay.classList.add('hide'), 300);
+        }
+
+        function handleNextClick() {
+            playSound('click');
+            closeQuiz();
+            initMap(); 
+            
+            const index = state.currentQuizIndex;
+            
+            if (index === 9 && state.unlockedLevel === 10) {
+                setTimeout(() => {
+                    playSound('winLevel');
+                    document.getElementById('transition-screen').classList.remove('hide');
+                }, 400);
+            } else if (index === 19 && state.unlockedLevel === 20) {
+                setTimeout(() => {
+                    triggerEndSequence();
+                }, 400);
+            } else {
+                setTimeout(() => {
+                    setAvatarPosition(index, true); 
+                    if(state.unlockedLevel < 20) {
+                        moveAvatar(state.unlockedLevel);
+                    }
+                }, 400);
+            }
+        }
+
+        function closeTransition() {
+            playSound('click');
+            document.getElementById('transition-screen').classList.add('hide');
+            initMap(); 
+            setTimeout(() => {
+                moveAvatar(10); 
+            }, 300);
+        }
+
+        function triggerEndSequence() {
+            stopBGM();
+
+            const avatar = document.getElementById('avatar');
+            avatar.className = 'avatar-walk';
+            avatar.style.transition = `left 1s linear, top 1s linear`;
+            avatar.style.left = '1450px'; 
+            avatar.style.top = '200px';
+            
+            centerCameraOn(1450, 150, true);
+
+            setTimeout(() => {
+                avatar.className = 'avatar-happy';
+                playSound('treasure');
+                
+                const chest = document.getElementById('treasure-chest');
+                chest.classList.add('open');
+                createParticles(chest, 'star', 30);
+
+                setTimeout(() => {
+                    showResultsScreen();
+                }, 2000);
+
+            }, 1000);
+        }
+
+        function showResultsScreen() {
+            document.getElementById('results-screen').classList.remove('hide');
+            
+            const correctCount = state.answers.filter((a, i) => a === questions[i].correctIndex).length;
+            const pct = Math.round((correctCount / 20) * 100);
+            
+            document.getElementById('final-score').innerText = state.score;
+            document.getElementById('final-pct').innerText = `${pct}%`;
+            document.getElementById('final-correct').innerText = correctCount;
+            document.getElementById('final-incorrect').innerText = 20 - correctCount;
+
+            const msgEl = document.getElementById('final-msg');
+            if (pct >= 90) { msgEl.innerText = "Grammar Champion! You found the treasure!"; }
+            else if (pct >= 75) { msgEl.innerText = "Great Explorer! You are becoming a grammar expert!"; msgEl.className = "text-2xl font-bold text-blue-600 mb-8 font-sans"; }
+            else if (pct >= 50) { msgEl.innerText = "Good effort! Keep practising to improve your grammar!"; msgEl.className = "text-2xl font-bold text-yellow-600 mb-8 font-sans"; }
+            else { msgEl.innerText = "Every explorer learns step by step. Try again and become stronger!"; msgEl.className = "text-xl font-bold text-gray-700 mb-8 font-sans"; }
+
+            const teacherContainer = document.getElementById('teacher-link-container');
+            if (TEACHER_ASSESSMENT_URL && TEACHER_ASSESSMENT_URL.trim() !== "") {
+                teacherContainer.innerHTML = `<p class="text-sm text-gray-600 mb-3">Please submit your results to your teacher using the official form.</p><a href="${TEACHER_ASSESSMENT_URL}" target="_blank" class="btn-primary w-full text-center inline-block text-lg py-2 bg-blue-600 hover:bg-blue-500 shadow-[0_4px_0_#1d4ed8]">Open Official Assessment <i class="fa-solid fa-external-link-alt ml-1"></i></a>`;
+            } else {
+                teacherContainer.innerHTML = `<p class="text-gray-500 italic">Assessment submitted directly to live leaderboard.</p>`;
+            }
+
+            const payload = {
+                studentName: document.getElementById('student-name').value.trim(),
+                moeAccount: document.getElementById('moe-account').value.trim(),
+                score: state.score,
+                percentage: pct,
+                correctCount: correctCount,
+                incorrectCount: 20 - correctCount
+            };
+
+            if (window.saveScoreToFirebase) {
+                window.saveScoreToFirebase(payload).then(() => {
+                    loadLeaderboardData();
+                });
+            }
+        }
+
+        function showReview() {
+            playSound('click');
+            document.getElementById('results-screen').classList.add('hide');
+            document.getElementById('review-screen').classList.remove('hide');
+            
+            const list = document.getElementById('review-list');
+            list.innerHTML = '';
+            
+            questions.forEach((q, idx) => {
+                const userChoice = state.answers[idx];
+                const isCorrect = userChoice === q.correctIndex;
+                
+                const div = document.createElement('div');
+                div.className = 'bg-white p-5 rounded-2xl shadow-sm border-2 border-gray-200';
+                div.innerHTML = `
+                    <div class="flex items-start mb-3">
+                        <div class="mr-3 mt-1">
+                            ${isCorrect 
+                                ? '<i class="fa-solid fa-circle-check text-2xl text-green-500"></i>' 
+                                : '<i class="fa-solid fa-circle-xmark text-2xl text-red-500"></i>'}
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-gray-800 text-lg mb-2"><span class="text-gray-400 mr-1">${idx + 1}.</span> ${q.q}</h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-3">
+                                <div class="bg-gray-50 p-3 rounded-lg border ${isCorrect ? 'border-green-200' : 'border-red-200'}">
+                                    <span class="text-gray-500 text-xs uppercase font-bold block mb-1">Your Answer:</span>
+                                    <span class="font-semibold ${isCorrect ? 'text-green-700' : 'text-red-600'}">${userChoice !== null ? q.options[userChoice] : 'Skipped'}</span>
+                                </div>
+                                <div class="bg-green-50 p-3 rounded-lg border border-green-200">
+                                    <span class="text-green-600 text-xs uppercase font-bold block mb-1">Correct Answer:</span>
+                                    <span class="font-semibold text-green-800">${q.correctText}</span>
+                                </div>
+                            </div>
+                            <div class="bg-blue-50 p-3 rounded-lg text-sm text-gray-700 border border-blue-100">
+                                <strong>Explanation:</strong> ${q.explanation}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function closeReview() {
+            playSound('click');
+            document.getElementById('review-screen').classList.add('hide');
+            document.getElementById('results-screen').classList.remove('hide');
+        }
+
+        function restartGame() {
+            playSound('click');
+            state = {
+                unlockedLevel: 0,
+                currentQuizIndex: 0,
+                answers: new Array(20).fill(null),
+                score: 0,
+                stars: 0,
+                bgmEnabled: state.bgmEnabled,
+                sfxEnabled: state.sfxEnabled
+            };
+            
+            if (state.bgmEnabled) {
+                startBGM();
+            }
+            
+            document.getElementById('results-screen').classList.add('hide');
+            const chest = document.getElementById('treasure-chest');
+            if (chest) chest.classList.remove('open');
+            
+            updateHUD();
+            initMap();
+            setAvatarPosition(0, true);
+        }
+
+        function updateHUD() {
+            document.getElementById('ui-score').innerText = state.score;
+            document.getElementById('ui-stars').innerText = state.stars;
+        }
+
+        function createParticles(targetElement, type = 'star', count = 10) {
+            const rect = targetElement.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            for(let i=0; i<count; i++) {
+                const el = document.createElement('i');
+                el.className = 'fa-solid fa-star particle text-yellow-400';
+                el.style.left = `${centerX}px`;
+                el.style.top = `${centerY}px`;
+                el.style.fontSize = `${Math.random() * 15 + 15}px`;
+                
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * 100 + 50;
+                el.style.setProperty('--tx', `${Math.cos(angle) * distance}px`);
+                el.style.setProperty('--ty', `${Math.sin(angle) * distance}px`);
+                
+                document.body.appendChild(el);
+                setTimeout(() => el.remove(), 1000);
+            }
+        }
+    </script>
+</body>
+</html>
