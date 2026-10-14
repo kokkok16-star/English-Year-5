@@ -349,8 +349,8 @@
                 <label for="student-name" class="block font-bold text-gray-700 mb-2">Student Name</label>
                 <input type="text" id="student-name" placeholder="Enter your full name" autocomplete="name" class="w-full border-2 border-gray-300 rounded-xl p-3 text-lg" required>
 
-                <label for="moe-account" class="block font-bold text-gray-700 mt-4 mb-2">MOE Account</label>
-                <input type="email" id="moe-account" placeholder="Enter your MOE email address" autocomplete="email" class="w-full border-2 border-gray-300 rounded-xl p-3 text-lg" required>
+                <label for="moe-account" class="block font-bold text-gray-700 mt-4 mb-2">MOE Account (@moe-dl.edu.my)</label>
+                <input type="email" id="moe-account" placeholder="username@moe-dl.edu.my" autocomplete="email" class="w-full border-2 border-gray-300 rounded-xl p-3 text-lg" required>
             </div>
 
             <button onclick="startGame()" class="btn-primary btn-success w-full text-2xl py-4 animate-bounce">
@@ -437,7 +437,7 @@
         <div class="parchment-board">
             <div id="quiz-header" class="quiz-header theme-forest flex justify-between items-center shrink-0">
                 <div>
-                    <div class="text-sm font-bold text-white opacity-80 uppercase tracking-wider" id="region-title">Level 1: The Question Forest</div>
+                    <div class="text-sm font-bold text-white opacity-80 uppercase tracking-wider" id="region-title">Level 1: The Grammar Forest</div>
                     <div class="text-xl md:text-2xl font-black mt-1">Question <span id="q-num">1</span></div>
                 </div>
                 <button onclick="closeQuiz()" class="w-10 h-10 rounded-full bg-black bg-opacity-20 hover:bg-opacity-40 transition flex items-center justify-center text-white">
@@ -473,7 +473,7 @@
         <div class="bg-castle-dark rounded-3xl border-8 border-castle-border p-8 md:p-12 text-center max-w-xl w-full text-white shadow-2xl" style="animation: float-up 0.5s ease-out">
             <div class="text-7xl text-yellow-400 mb-6 drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]"><i class="fa-brands fa-fort-awesome animate-bounce"></i></div>
             <h2 class="text-4xl font-display font-black mb-4">Forest Conquered!</h2>
-            <p class="text-xl text-castle-light mb-8 font-sans font-semibold">You have mastered present continuous questions. The gates to <span class="text-yellow-300 font-bold">The Grammar Castle</span> are now open!</p>
+            <p class="text-xl text-castle-light mb-8 font-sans font-semibold">You have mastered key grammar concepts. The gates to <span class="text-yellow-300 font-bold">The Grammar Castle</span> are now open!</p>
             <button onclick="closeTransition()" class="btn-primary w-full text-xl py-4 bg-yellow-500 shadow-[0_6px_0_#ca8a04] hover:bg-yellow-400 text-wood">
                 Enter Castle Region <i class="fa-solid fa-key ml-2"></i>
             </button>
@@ -582,6 +582,26 @@
                     </button>
                 </div>
             </div>
+
+            <!-- 修复部分：补充原本缺失的表格节点，防止脚本读取报错崩溃 -->
+            <div class="flex-grow overflow-auto p-4">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-purple-100 text-purple-900 border-b border-purple-200">
+                            <th class="p-3">排名</th>
+                            <th class="p-3">学生姓名</th>
+                            <th class="p-3">MOE账号</th>
+                            <th class="p-3">得分</th>
+                            <th class="p-3">正确率</th>
+                            <th class="p-3">对/错题数</th>
+                            <th class="p-3">提交时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="teacher-table-body">
+                        <!-- 数据将由 JS 动态生成 -->
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -640,7 +660,7 @@
                 dateStr: new Date().toLocaleString()
             };
 
-            // 1. 无限期保存到本地 LocalStorage（永不过期，离线/在线均保留）
+            // 1. 保存到本地 LocalStorage
             try {
                 const localScores = JSON.parse(localStorage.getItem('eg_adventure_scores') || '[]');
                 localScores.push(newRecord);
@@ -650,21 +670,21 @@
             }
 
             // 2. 同步保存到 Firebase 云端
-            if (!db) await initFirebase();
-            if (currentUser) {
-                try {
+            try {
+                if (!db) await initFirebase();
+                if (currentUser && db) {
                     const scoreCollection = collection(db, 'artifacts', appId, 'public', 'data', 'scores');
                     await addDoc(scoreCollection, newRecord);
-                } catch (e) {
-                    console.error("Error saving score to Firebase:", e);
                 }
+            } catch (e) {
+                console.error("Error saving score to Firebase:", e);
             }
         };
 
         window.fetchScoresFromFirebase = async function() {
             let allScores = [];
 
-            // 1. 从本地 LocalStorage 读取（永久无限期保留）
+            // 1. 从本地 LocalStorage 读取
             try {
                 const localScores = JSON.parse(localStorage.getItem('eg_adventure_scores') || '[]');
                 allScores = [...localScores];
@@ -672,10 +692,10 @@
                 console.warn("LocalStorage fetch error:", e);
             }
 
-            // 2. 从 Firebase 获取并进行云端+本地去重合并
-            if (!db) await initFirebase();
-            if (currentUser) {
-                try {
+            // 2. 从 Firebase 获取并去重合并
+            try {
+                if (!db) await initFirebase();
+                if (currentUser && db) {
                     const scoreCollection = collection(db, 'artifacts', appId, 'public', 'data', 'scores');
                     const snapshot = await getDocs(scoreCollection);
                     snapshot.forEach(doc => {
@@ -684,16 +704,15 @@
                             allScores.push({ id: doc.id, ...data });
                         }
                     });
-                } catch (e) {
-                    console.error("Error fetching scores from Firebase:", e);
                 }
+            } catch (e) {
+                console.error("Error fetching scores from Firebase:", e);
             }
 
             allScores.sort((a, b) => (b.score || 0) - (a.score || 0) || (b.percentage || 0) - (a.percentage || 0));
             return allScores;
         };
 
-        // 一键导出 CSV（永久备份到本地电脑）
         window.exportScoresToCSV = async function() {
             const scores = await window.fetchScoresFromFirebase();
             if (!scores.length) {
@@ -761,7 +780,6 @@
             return 440 * Math.pow(2, (note - 69) / 12);
         }
 
-        // Map Node Coordinates (20 Nodes: Forest 1-10, Castle 11-20)
         const nodeCoords = [
             { x: 150, y: 820 }, { x: 280, y: 740 }, { x: 420, y: 800 }, { x: 560, y: 700 }, { x: 680, y: 780 },
             { x: 810, y: 670 }, { x: 940, y: 740 }, { x: 1080, y: 620 }, { x: 1220, y: 700 }, { x: 1350, y: 620 },
@@ -769,28 +787,41 @@
             { x: 350, y: 330 }, { x: 500, y: 230 }, { x: 750, y: 260 }, { x: 1050, y: 210 }, { x: 1400, y: 180 }
         ];
 
-        // 20 Year 5 English Grammar Questions
+        // 重新修订的 20 道语法选择题：囊括 Present Continuous (Affirmative, Negative, Questions) 及 Present Simple
         const questions = [
-            { q: "Is he _____ a book right now?", options: ["A. read", "B. reading", "C. reads", "D. readed"], correctIndex: 1, correctText: "reading", explanation: "With 'Is', we use the present continuous form (verb + ing)." },
-            { q: "_____ they playing basketball in the court?", options: ["A. Is", "B. Are", "C. Am", "D. Do"], correctIndex: 1, correctText: "Are", explanation: "Use 'Are' for plural subject 'they' in present continuous questions." },
-            { q: "What _____ you doing at this moment?", options: ["A. is", "B. are", "C. am", "D. was"], correctIndex: 1, correctText: "are", explanation: "'you' takes 'are' in present continuous questions." },
-            { q: "_____ she cooking dinner for the family?", options: ["A. Are", "B. Is", "C. Am", "D. Does"], correctIndex: 1, correctText: "Is", explanation: "'she' is singular, so start with 'Is'." },
-            { q: "Where _____ the children running to?", options: ["A. is", "B. are", "C. am", "D. do"], correctIndex: 1, correctText: "are", explanation: "'children' is plural, so we use 'are'." },
-            { q: "Why _____ he crying so loudly?", options: ["A. are", "B. am", "C. is", "D. do"], correctIndex: 2, correctText: "is", explanation: "'he' takes 'is' in present continuous questions." },
-            { q: "Is the dog _____ in the garden?", options: ["A. bark", "B. barks", "C. barking", "D. barked"], correctIndex: 2, correctText: "barking", explanation: "Present continuous uses verb + ing after 'Is'." },
-            { q: "_____ I doing this exercise correctly?", options: ["A. Am", "B. Is", "C. Are", "D. Do"], correctIndex: 0, correctText: "Am", explanation: "'I' uses 'Am' in continuous question structures." },
-            { q: "Who _____ listening to music in the living room?", options: ["A. are", "B. is", "C. am", "D. be"], correctIndex: 1, correctText: "is", explanation: "'Who' singular takes 'is'." },
-            { q: "Are we _____ to the beach today?", options: ["A. go", "B. went", "C. going", "D. gone"], correctIndex: 2, correctText: "going", explanation: "'Are we...' requires the -ing form 'going'." },
-            { q: "_____ it raining heavily outside?", options: ["A. Are", "B. Is", "C. Do", "D. Am"], correctIndex: 1, correctText: "Is", explanation: "'it' takes 'Is' in present continuous." },
-            { q: "What are the students _____ in the science lab?", options: ["A. study", "B. studied", "C. studying", "D. studies"], correctIndex: 2, correctText: "studying", explanation: "After 'are the students', use verb + ing." },
-            { q: "_____ you listening to the teacher carefully?", options: ["A. Is", "B. Are", "C. Am", "D. Does"], correctIndex: 1, correctText: "Are", explanation: "Questions starting with 'you' use 'Are'." },
-            { q: "Why is she _____ her homework late tonight?", options: ["A. do", "B. did", "C. doing", "D. done"], correctIndex: 2, correctText: "doing", explanation: "'is she...' takes 'doing'." },
-            { q: "Where _____ they having their lunch right now?", options: ["A. are", "B. is", "C. am", "D. do"], correctIndex: 0, correctText: "are", explanation: "'they' requires 'are'." },
-            { q: "_____ he writing a story for the competition?", options: ["A. Is", "B. Are", "C. Am", "D. Do"], correctIndex: 0, correctText: "Is", explanation: "'he' requires 'Is'." },
-            { q: "What are you _____ for in your bag?", options: ["A. look", "B. looking", "C. looked", "D. looks"], correctIndex: 1, correctText: "looking", explanation: "'are you...' takes 'looking'." },
-            { q: "Is the cat _____ on the soft cushion?", options: ["A. sleep", "B. slept", "C. sleeping", "D. sleeps"], correctIndex: 2, correctText: "sleeping", explanation: "'Is the cat...' needs 'sleeping'." },
-            { q: "Why _____ we waiting in this long queue?", options: ["A. is", "B. are", "C. am", "D. do"], correctIndex: 1, correctText: "are", explanation: "'we' takes 'are'." },
-            { q: "Are the birds _____ high up in the blue sky?", options: ["A. fly", "B. flew", "C. flying", "D. flown"], correctIndex: 2, correctText: "flying", explanation: "'Are the birds...' requires 'flying'." }
+            // Present Continuous - Questions
+            { q: "_____ they playing basketball in the court now?", options: ["A. Is", "B. Are", "C. Am", "D. Do"], correctIndex: 1, correctText: "Are", explanation: "Use 'Are' for plural subject 'they' in present continuous questions." },
+            { q: "What _____ you doing at this moment?", options: ["A. is", "B. are", "C. am", "D. does"], correctIndex: 1, correctText: "are", explanation: "'you' takes 'are' in present continuous questions." },
+            
+            // Present Continuous - Affirmative
+            { q: "Listen! She _____ a beautiful song in the room.", options: ["A. is singing", "B. sings", "C. sing", "D. sung"], correctIndex: 0, correctText: "is singing", explanation: "For present continuous affirmative with 'She', use 'is + verb-ing'." },
+            { q: "Look! The children _____ in the garden right now.", options: ["A. runs", "B. is running", "C. are running", "D. ran"], correctIndex: 2, correctText: "are running", explanation: "Plural subject 'children' takes 'are running' in present continuous." },
+            
+            // Present Continuous - Negative
+            { q: "He _____ watching television right now; he is studying.", options: ["A. isn't", "B. aren't", "C. doesn't", "D. don't"], correctIndex: 0, correctText: "isn't", explanation: "Singular subject 'He' uses 'isn't' in present continuous negative." },
+            { q: "They _____ playing football because it is raining.", options: ["A. isn't", "B. aren't", "C. doesn't", "D. don't"], correctIndex: 1, correctText: "aren't", explanation: "Plural subject 'They' uses 'aren't' for present continuous negative." },
+            
+            // Present Simple - Affirmative
+            { q: "My father _____ to work by car every morning.", options: ["A. go", "B. is going", "C. goes", "D. went"], correctIndex: 2, correctText: "goes", explanation: "For daily routines with singular 'My father', add '-es' to the verb (goes)." },
+            { q: "Cats _____ milk and fish.", options: ["A. likes", "B. like", "C. is liking", "D. liked"], correctIndex: 1, correctText: "like", explanation: "Plural subject 'Cats' takes base verb 'like' in Present Simple." },
+
+            // Present Simple - Negative
+            { q: "She _____ like ice cream.", options: ["A. don't", "B. isn't", "C. doesn't", "D. aren't"], correctIndex: 2, correctText: "doesn't", explanation: "'She' requires 'doesn't' for present simple negative." },
+            { q: "We _____ live in London.", options: ["A. doesn't", "B. don't", "C. isn't", "D. aren't"], correctIndex: 1, correctText: "don't", explanation: "'We' takes 'don't' for present simple negative." },
+
+            // Present Simple - Questions
+            { q: "_____ you clean your bedroom every weekend?", options: ["A. Are", "B. Do", "C. Does", "D. Is"], correctIndex: 1, correctText: "Do", explanation: "Use 'Do' for 'you' in present simple questions about regular habits." },
+            { q: "_____ he play badminton every Sunday?", options: ["A. Do", "B. Is", "C. Does", "D. Are"], correctIndex: 2, correctText: "Does", explanation: "Use 'Does' for singular subject 'he' in present simple questions." },
+
+            // Mixed Practice (Questions, Affirmative, Negative)
+            { q: "Where _____ your sister live?", options: ["A. is", "B. do", "C. does", "D. are"], correctIndex: 2, correctText: "does", explanation: "'your sister' is singular, so present simple question uses 'does'." },
+            { q: "Why _____ he crying so loudly right now?", options: ["A. does", "B. is", "C. are", "D. do"], correctIndex: 1, correctText: "is", explanation: "'right now' indicates present continuous: 'is he crying'." },
+            { q: "I _____ doing my homework at the moment.", options: ["A. am", "B. do", "C. is", "D. are"], correctIndex: 0, correctText: "am", explanation: "'I' takes 'am' in present continuous." },
+            { q: "They usually _____ breakfast at 7:00 a.m.", options: ["A. are having", "B. has", "C. have", "D. having"], correctIndex: 2, correctText: "have", explanation: "'usually' indicates present simple. 'They' takes 'have'." },
+            { q: "_____ it raining heavily outside right now?", options: ["A. Does", "B. Is", "C. Do", "D. Are"], correctIndex: 1, correctText: "Is", explanation: "Present continuous question with 'it' starts with 'Is'." },
+            { q: "The sun _____ in the east.", options: ["A. is rising", "B. rise", "C. rises", "D. rose"], correctIndex: 2, correctText: "rises", explanation: "General truths use Present Simple with '-s' (rises)." },
+            { q: "We _____ not going to the park today.", options: ["A. do", "B. are", "C. is", "D. does"], correctIndex: 1, correctText: "are", explanation: "Present continuous negative with 'We' takes 'are not'." },
+            { q: "What time _____ you usually wake up?", options: ["A. are", "B. do", "C. does", "D. is"], correctIndex: 1, correctText: "do", explanation: "Present simple habit with 'you' takes 'do'." }
         ];
 
         function openTeacherLogin() {
@@ -827,35 +858,40 @@
             const tbody = document.getElementById('teacher-table-body');
             const publicBoard = document.getElementById('public-leaderboard');
 
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-gray-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>正在载入 Firebase 数据...</td></tr>`;
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-gray-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>正在载入数据...</td></tr>`;
+            }
             if (publicBoard) {
                 publicBoard.innerHTML = `<p class="text-gray-500 text-center py-4"><i class="fa-solid fa-spinner fa-spin mr-2"></i>加载排行榜中...</p>`;
             }
 
             const scores = await window.fetchScoresFromFirebase();
-            document.getElementById('dashboard-total-count').innerText = scores.length;
+            const totalCountEl = document.getElementById('dashboard-total-count');
+            if (totalCountEl) totalCountEl.innerText = scores.length;
 
             if (scores.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-gray-400">暂无答题记录</td></tr>`;
+                if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-gray-400">暂无答题记录</td></tr>`;
                 if (publicBoard) publicBoard.innerHTML = `<p class="text-gray-400 text-center py-3">尚无榜单记录，快成为第一个打榜英雄吧！</p>`;
                 return;
             }
 
-            tbody.innerHTML = '';
-            scores.forEach((item, index) => {
-                const tr = document.createElement('tr');
-                tr.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
-                tr.innerHTML = `
-                    <td class="p-3 font-bold ${index < 3 ? 'text-yellow-600' : 'text-gray-500'}">#${index + 1}</td>
-                    <td class="p-3 font-bold text-gray-800">${escapeHtml(item.studentName || '匿名')}</td>
-                    <td class="p-3 text-gray-500">${escapeHtml(item.moeAccount || '-')}</td>
-                    <td class="p-3 font-extrabold text-blue-600">${item.score || 0} pts</td>
-                    <td class="p-3 font-bold text-yellow-600">${item.percentage || 0}%</td>
-                    <td class="p-3"><span class="text-green-600 font-bold">${item.correctCount || 0}</span> / <span class="text-red-500 font-bold">${item.incorrectCount || 0}</span></td>
-                    <td class="p-3 text-xs text-gray-400">${item.dateStr || '-'}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+            if (tbody) {
+                tbody.innerHTML = '';
+                scores.forEach((item, index) => {
+                    const tr = document.createElement('tr');
+                    tr.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                    tr.innerHTML = `
+                        <td class="p-3 font-bold ${index < 3 ? 'text-yellow-600' : 'text-gray-500'}">#${index + 1}</td>
+                        <td class="p-3 font-bold text-gray-800">${escapeHtml(item.studentName || '匿名')}</td>
+                        <td class="p-3 text-gray-500">${escapeHtml(item.moeAccount || '-')}</td>
+                        <td class="p-3 font-extrabold text-blue-600">${item.score || 0} pts</td>
+                        <td class="p-3 font-bold text-yellow-600">${item.percentage || 0}%</td>
+                        <td class="p-3"><span class="text-green-600 font-bold">${item.correctCount || 0}</span> / <span class="text-red-500 font-bold">${item.incorrectCount || 0}</span></td>
+                        <td class="p-3 text-xs text-gray-400">${item.dateStr || '-'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
 
             if (publicBoard) {
                 publicBoard.innerHTML = '';
@@ -1077,22 +1113,13 @@
             const moeAccount = document.getElementById('moe-account').value.trim();
 
             if (!studentName || !moeAccount) {
-                const btn = document.querySelector('#start-screen button.btn-success');
-                const origText = btn.innerHTML;
-                btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Fill all fields!';
-                btn.classList.remove('btn-success');
-                btn.classList.add('bg-red-500', 'text-white');
-                setTimeout(() => { btn.innerHTML = origText; btn.classList.remove('bg-red-500', 'text-white'); btn.classList.add('btn-success'); }, 2000);
+                showStartError('Fill all fields!');
                 return;
             }
 
-            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(moeAccount)) {
-                const btn = document.querySelector('#start-screen button.btn-success');
-                const origText = btn.innerHTML;
-                btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Invalid Email!';
-                btn.classList.remove('btn-success');
-                btn.classList.add('bg-red-500', 'text-white');
-                setTimeout(() => { btn.innerHTML = origText; btn.classList.remove('bg-red-500', 'text-white'); btn.classList.add('btn-success'); }, 2000);
+            // 修复部分：必须以 @moe-dl.edu.my 结尾
+            if (!/^[a-zA-Z0-9._%+-]+@moe-dl\.edu\.my$/i.test(moeAccount)) {
+                showStartError('Must end with @moe-dl.edu.my!');
                 return;
             }
 
@@ -1106,6 +1133,19 @@
             updateHUD();
             setAvatarPosition(0, true);
             playSound('click');
+        }
+
+        function showStartError(msg) {
+            const btn = document.querySelector('#start-screen button.btn-success');
+            const origText = btn.innerHTML;
+            btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${msg}`;
+            btn.classList.remove('btn-success');
+            btn.classList.add('bg-red-500', 'text-white');
+            setTimeout(() => { 
+                btn.innerHTML = origText; 
+                btn.classList.remove('bg-red-500', 'text-white'); 
+                btn.classList.add('btn-success'); 
+            }, 2000);
         }
 
         function initMap() {
@@ -1280,7 +1320,7 @@
             
             if (index < 10) {
                 header.className = 'quiz-header theme-forest flex justify-between items-center shrink-0';
-                regionTitle.innerText = "Level 1: The Question Forest";
+                regionTitle.innerText = "Level 1: The Grammar Forest";
             } else {
                 header.className = 'quiz-header theme-castle flex justify-between items-center shrink-0';
                 regionTitle.innerText = "Level 2: The Grammar Castle";
